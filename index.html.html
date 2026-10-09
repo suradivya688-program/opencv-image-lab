@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenCV.js Image Lab</title>
+  <style>
+    :root {
+      --bg: #10151d;
+      --panel: #19222e;
+      --panel2: #202c3a;
+      --text: #eef4fb;
+      --muted: #9fb0c2;
+      --accent: #45d6b5;
+      --accent2: #ffb86b;
+      --border: #304154;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      background: radial-gradient(circle at 10% 0%, #243a48 0, transparent 34%), var(--bg);
+      color: var(--text); font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    header { padding: 28px 6vw 20px; border-bottom: 1px solid var(--border); }
+    .eyebrow { color: var(--accent); font-size: .78rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 8px 0; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.05; }
+    h1 span { color: var(--accent); }
+    .subtitle { color: var(--muted); max-width: 760px; line-height: 1.6; }
+    main { width: min(1180px, 92vw); margin: 26px auto 44px; }
+    .status { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; margin-bottom: 18px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 12px #ffb86b66; }
+    .dot.ready { background: var(--accent); box-shadow: 0 0 12px #45d6b566; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 18px; }
+    button, .upload-label {
+      border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+      padding: 11px 15px; border-radius: 11px; font-weight: 700; cursor: pointer; transition: .18s ease;
+    }
+    button:hover, .upload-label:hover { transform: translateY(-1px); border-color: var(--accent); }
+    button.active { background: var(--accent); color: #09221d; border-color: var(--accent); }
+    button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+    .upload-label { display: inline-block; background: var(--accent); color: #09221d; border-color: var(--accent); }
+    input[type=file] { display: none; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; margin-top: 18px; }
+    .preview, .controls, .info-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; }
+    .preview { padding: 16px; min-width: 0; }
+    .preview-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 12px; }
+    h2 { font-size: 1rem; margin: 0; }
+    .badge { font-size: .75rem; color: var(--accent); border: 1px solid #45d6b555; padding: 5px 8px; border-radius: 99px; }
+    .canvas-wrap { min-height: 330px; display: grid; place-items: center; background: #0c1118; border: 1px dashed #405266; border-radius: 14px; overflow: auto; }
+    canvas { display: block; max-width: 100%; height: auto; }
+    .placeholder { color: var(--muted); padding: 28px; text-align: center; line-height: 1.7; }
+    .controls { padding: 18px; }
+    .controls h2 { margin-bottom: 18px; }
+    .control { margin: 18px 0; }
+    .control label { display: flex; justify-content: space-between; gap: 12px; font-size: .88rem; margin-bottom: 9px; }
+    .control output { color: var(--accent); font-weight: 800; }
+    input[type=range] { width: 100%; accent-color: var(--accent); }
+    .download { width: 100%; margin-top: 12px; background: var(--accent2); color: #2b1b08; border-color: var(--accent2); }
+    .bottom { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+    .info-card { padding: 16px; }
+    .info-card strong { color: var(--accent); display: block; margin-bottom: 7px; }
+    .info-card p { color: var(--muted); font-size: .88rem; line-height: 1.55; margin: 0; }
+    footer { text-align: center; color: var(--muted); padding: 0 20px 28px; font-size: .82rem; }
+    @media (max-width: 800px) {
+      .workspace { grid-template-columns: 1fr; }
+      .bottom { grid-template-columns: 1fr; }
+      .canvas-wrap { min-height: 230px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Computer Vision • Mini Project</div>
+    <h1>OpenCV.js <span>Image Lab</span></h1>
+    <p class="subtitle">Upload a picture and explore computer-vision techniques in your browser: grayscale conversion, blur, edge detection, and thresholding. This project uses OpenCV.js with HTML, CSS, and JavaScript in one file.</p>
+  </header>
+
+  <main>
+    <div class="status"><span id="statusDot" class="dot"></span><span id="statusText">Loading OpenCV.js library…</span></div>
+
+    <section class="toolbar" aria-label="Image processing tools">
+      <label class="upload-label" for="imageInput">＋ Upload Image</label>
+      <input id="imageInput" type="file" accept="image/*">
+      <button class="filter-btn active" data-filter="original">Original</button>
+      <button class="filter-btn" data-filter="gray">Grayscale</button>
+      <button class="filter-btn" data-filter="blur">Gaussian Blur</button>
+      <button class="filter-btn" data-filter="edges">Edge Detection</button>
+      <button class="filter-btn" data-filter="threshold">Threshold</button>
+      <button id="resetBtn">Reset</button>
+    </section>
+
+    <section class="workspace">
+      <div class="preview">
+        <div class="preview-head">
+          <h2 id="previewTitle">Your image preview</h2>
+          <span class="badge" id="filterBadge">ORIGINAL</span>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="placeholder" id="placeholder">🖼️<br><strong>Start with an image</strong><br>Choose “Upload Image” to try the OpenCV filters.</div>
+          <canvas id="outputCanvas" hidden></canvas>
+        </div>
+      </div>
+
+      <aside class="controls">
+        <h2>⚙️ Filter controls</h2>
+        <div class="control">
+          <label for="blurRange">Blur strength <output id="blurValue">5</output></label>
+          <input id="blurRange" type="range" min="1" max="21" step="2" value="5">
+        </div>
+        <div class="control">
+          <label for="thresholdRange">Threshold level <output id="thresholdValue">127</output></label>
+          <input id="thresholdRange" type="range" min="0" max="255" value="127">
+        </div>
+        <div class="control">
+          <label for="edgeRange">Edge sensitivity <output id="edgeValue">80</output></label>
+          <input id="edgeRange" type="range" min="10" max="200" value="80">
+        </div>
+        <button id="downloadBtn" class="download" disabled>↓ Download Result</button>
+        <p style="color:var(--muted);font-size:.82rem;line-height:1.55;margin-top:14px">Tip: Try Edge Detection on a picture with clear outlines. Use Threshold to turn a grayscale image into black and white.</p>
+      </aside>
+    </section>
+
+    <section class="bottom">
+      <div class="info-card"><strong>01 / Grayscale</strong><p>Converts a color image into shades of gray, which is useful for many computer-vision tasks.</p></div>
+      <div class="info-card"><strong>02 / Edge Detection</strong><p>Uses the Canny algorithm to highlight strong boundaries and outlines in an image.</p></div>
+      <div class="info-card"><strong>03 / Thresholding</strong><p>Separates pixels into black and white according to the selected brightness threshold.</p></div>
+    </section>
+  </main>
+
+  <footer>OpenCV.js Image Lab • Runs in your browser • Uploaded images are processed locally by this page.</footer>
+
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="opencvScriptLoaded()"></script>
+  <script>
+    let cvReady = false;
+    let sourceMat = null;
+    let currentFilter = "original";
+    const canvas = document.getElementById("outputCanvas");
+    const ctx = canvas.getContext("2d");
+    const imageInput = document.getElementById("imageInput");
+    const placeholder = document.getElementById("placeholder");
+
+    function opencvScriptLoaded() {
+      if (typeof cv === "undefined") {
+        setStatus("OpenCV.js could not be loaded. Check your internet connection and refresh.", false);
+        return;
+      }
+      cv["onRuntimeInitialized"] = () => {
+        cvReady = true;
+        setStatus("OpenCV.js is ready — upload an image to begin.", true);
+      };
+    }
+    function setStatus(text, ready) {
+      document.getElementById("statusText").textContent = text;
+      document.getElementById("statusDot").classList.toggle("ready", !!ready);
+    }
+
+    imageInput.addEventListener("change", event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        setStatus("Please choose a valid image file.", false);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        const maxSide = 1400;
+        const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        placeholder.hidden = true;
+        canvas.hidden = false;
+        if (sourceMat) sourceMat.delete();
+        if (cvReady) {
+          sourceMat = cv.imread(canvas);
+          applyFilter(currentFilter);
+        } else {
+          setStatus("Image loaded. Waiting for OpenCV.js to finish loading…", false);
+        }
+        document.getElementById("downloadBtn").disabled = false;
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => setStatus("Could not open this image. Try another file.", false);
+      img.src = URL.createObjectURL(file);
+    });
+
+    function applyFilter(filter) {
+      if (!cvReady || !sourceMat) {
+        if (!cvReady) setStatus("OpenCV.js is still loading. Please wait a moment.", false);
+        return;
+      }
+      currentFilter = filter;
+      let output = new cv.Mat();
+      let gray = new cv.Mat();
+      try {
+        switch (filter) {
+          case "gray":
+            cv.cvtColor(sourceMat, output, cv.COLOR_RGBA2GRAY);
+            cv.cvtColor(output, output, cv.COLOR_GRAY2RGBA);
+            break;
+          case "blur": {
+            const k = Number(document.getElementById("blurRange").value) | 1;
+            cv.GaussianBlur(sourceMat, output, new cv.Size(k, k), 0, 0, cv.BORDER_DEFAULT);
+            break;
+          }
+          case "edges": {
+            cv.cvtColor(sourceMat, gray, cv.COLOR_RGBA2GRAY);
+            cv.Canny(gray, output, Number(document.getElementById("edgeRange").value), Number(document.getElementById("edgeRange").value) * 2);
+            cv.cvtColor(output, output, cv.COLOR_GRAY2RGBA);
+            break;
+          }
+          case "threshold": {
+            cv.cvtColor(sourceMat, gray, cv.COLOR_RGBA2GRAY);
+            cv.threshold(gray, output, Number(document.getElementById("thresholdRange").value), 255, cv.THRESH_BINARY);
+            cv.cvtColor(output, output, cv.COLOR_GRAY2RGBA);
+            break;
+          }
+          default:
+            output = sourceMat.clone();
+        }
+        cv.imshow(canvas, output);
+        document.getElementById("filterBadge").textContent = filter.toUpperCase();
+        document.getElementById("previewTitle").textContent = filter === "original" ? "Original image" : filter.replace(/^\w/, c => c.toUpperCase()) + " result";
+        document.querySelectorAll(".filter-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.filter === filter));
+        setStatus("Processing complete — " + filter + " applied.", true);
+      } catch (error) {
+        console.error(error);
+        setStatus("Could not process this image. Try a different image.", false);
+      } finally {
+        output.delete();
+        gray.delete();
+      }
+    }
+
+    document.querySelectorAll(".filter-btn").forEach(btn => btn.addEventListener("click", () => applyFilter(btn.dataset.filter)));
+    document.getElementById("blurRange").addEventListener("input", e => {
+      document.getElementById("blurValue").textContent = e.target.value;
+      if (currentFilter === "blur") applyFilter("blur");
+    });
+    document.getElementById("thresholdRange").addEventListener("input", e => {
+      document.getElementById("thresholdValue").textContent = e.target.value;
+      if (currentFilter === "threshold") applyFilter("threshold");
+    });
+    document.getElementById("edgeRange").addEventListener("input", e => {
+      document.getElementById("edgeValue").textContent = e.target.value;
+      if (currentFilter === "edges") applyFilter("edges");
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      if (!sourceMat) return;
+      applyFilter("original");
+    });
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      if (canvas.hidden) return;
+      const link = document.createElement("a");
+      link.download = "opencv-image-result.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+  </script>
+</body>
+</html>
